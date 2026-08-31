@@ -36,7 +36,7 @@ router.get('/:username', optionalAuth, async (req, res) => {
 
     res.json({ user: { ...u, ...stats.rows[0], is_following: isFollowing } });
   } catch (error) {
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 
@@ -67,7 +67,7 @@ router.get('/:username/posts', optionalAuth, async (req, res) => {
 
     res.json({ posts: posts.rows });
   } catch (error) {
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 
@@ -96,7 +96,7 @@ router.post('/:id/follow', authenticateToken, async (req, res) => {
       res.json({ following: true, message: '关注成功' });
     }
   } catch (error) {
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 
@@ -111,7 +111,7 @@ router.get('/:id/followers', async (req, res) => {
     `, [id]);
     res.json({ followers: followers.rows });
   } catch (error) {
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 
@@ -126,7 +126,7 @@ router.get('/:id/following', async (req, res) => {
     `, [id]);
     res.json({ following: following.rows });
   } catch (error) {
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 
@@ -141,7 +141,7 @@ router.get('/search/:query', async (req, res) => {
     `, [`%${query}%`]);
     res.json({ users: users.rows });
   } catch (error) {
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 

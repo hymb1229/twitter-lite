@@ -51,7 +51,7 @@ router.get('/', optionalAuth, async (req, res) => {
     res.json({ posts: postsWithRetweet });
   } catch (error) {
     console.error('Get posts error:', error);
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 
@@ -69,7 +69,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: '帖子不存在' });
     res.json({ post: result.rows[0] });
   } catch (error) {
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 
@@ -102,7 +102,7 @@ router.post('/', authenticateToken, upload.single('image'), async (req, res) => 
     res.status(201).json({ message: '发帖成功', post: { ...postWithUser.rows[0], likes_count: 0, comments_count: 0, retweets_count: 0 } });
   } catch (error) {
     console.error('Create post error:', error);
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 
@@ -118,7 +118,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     await pool.query('DELETE FROM posts WHERE id = $1', [id]);
     res.json({ message: '删除成功' });
   } catch (error) {
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 
@@ -140,7 +140,7 @@ router.post('/:id/like', authenticateToken, async (req, res) => {
       res.json({ liked: true, message: '点赞成功' });
     }
   } catch (error) {
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 
@@ -162,7 +162,7 @@ router.post('/:id/retweet', authenticateToken, async (req, res) => {
       res.json({ retweeted: true, message: '转发成功' });
     }
   } catch (error) {
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 
@@ -177,7 +177,7 @@ router.get('/:id/comments', optionalAuth, async (req, res) => {
     `, [id]);
     res.json({ comments: comments.rows });
   } catch (error) {
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 
@@ -203,7 +203,7 @@ router.post('/:id/comments', authenticateToken, async (req, res) => {
 
     res.status(201).json({ comment: commentWithUser.rows[0], message: '评论成功' });
   } catch (error) {
-    res.status(500).json({ error: '服务器错误' });
+    res.status(500).json({ error: '服务器错误: $服务器错误' });
   }
 });
 

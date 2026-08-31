@@ -1,732 +1,369 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Twitter Lite - 社交媒体平台</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #000; color: #fff; min-height: 100vh; }
-        .container { display: flex; max-width: 1300px; margin: 0 auto; }
-
-        /* 登录/注册弹窗 */
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-overlay.show { display: flex; }
-        .modal { background: #16181c; padding: 32px; border-radius: 16px; width: 400px; max-width: 90%; }
-        .modal h2 { margin-bottom: 20px; font-size: 24px; }
-        .modal input { width: 100%; padding: 12px 16px; margin-bottom: 12px; background: #202327; border: 1px solid #2f3336; border-radius: 8px; color: #fff; font-size: 15px; outline: none; }
-        .modal input:focus { border-color: #ffffff; }
-        .modal .btn { width: 100%; padding: 12px; background: #ffffff; border: none; border-radius: 24px; color: #fff; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 8px; }
-        .modal .btn:hover { background: #666666; }
-        .modal .btn-secondary { background: transparent; border: 1px solid #536471; color: #fff; margin-top: 8px; }
-        .modal .link { color: #ffffff; cursor: pointer; display: block; text-align: center; margin-top: 16px; }
-        .modal .close { position: absolute; top: 20px; right: 20px; color: #fff; font-size: 24px; cursor: pointer; }
-
-        /* 左侧导航 */
-        .sidebar-left { width: 275px; padding: 20px; position: sticky; top: 0; height: 100vh; }
-        .logo { font-size: 28px; padding: 10px; margin-bottom: 20px; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer; transition: background 0.2s; }
-        .logo:hover { background: #181818; }
-        .nav-item { display: flex; align-items: center; padding: 15px; font-size: 20px; border-radius: 30px; margin-bottom: 5px; cursor: pointer; transition: background 0.2s; }
-        .nav-item:hover { background: #181818; }
-        .nav-item.active { font-weight: bold; }
-        .nav-item svg { width: 26px; height: 26px; margin-right: 20px; }
-        .tweet-btn { background: #ffffff; color: #fff; border: none; padding: 15px; border-radius: 30px; font-size: 17px; font-weight: bold; margin-top: 20px; cursor: pointer; width: 90%; transition: background 0.2s; }
-        .tweet-btn:hover { background: #666666; }
-
-        /* 用户信息区 */
-        .user-menu { display: flex; align-items: center; padding: 12px; border-radius: 30px; margin-top: auto; cursor: pointer; transition: background 0.2s; }
-        .user-menu:hover { background: #181818; }
-        .user-menu .avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 12px; }
-        .user-menu-info { flex: 1; }
-        .user-menu-name { font-weight: bold; font-size: 15px; }
-        .user-menu-handle { color: #71767b; font-size: 14px; }
-
-        /* 中间内容 */
-        .main-content { flex: 1; border-left: 1px solid #2f3336; border-right: 1px solid #2f3336; min-height: 100vh; }
-        .header { position: sticky; top: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); padding: 12px 16px; border-bottom: 1px solid #2f3336; z-index: 100; display: flex; justify-content: space-between; align-items: center; }
-        .header h1 { font-size: 20px; font-weight: bold; }
-        .refresh-btn { background: #ffffff; border: none; padding: 8px 16px; border-radius: 20px; color: #fff; font-weight: bold; cursor: pointer; }
-
-        .post-box { padding: 16px; border-bottom: 1px solid #2f3336; display: flex; gap: 12px; }
-        .avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; cursor: pointer; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .post-input { flex: 1; }
-        .post-input textarea { width: 100%; background: transparent; border: none; color: #fff; font-size: 20px; resize: none; outline: none; min-height: 50px; font-family: inherit; }
-        .post-input textarea::placeholder { color: #71767b; }
-        .post-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid #2f3336; }
-        .post-icons { display: flex; gap: 15px; color: #ffffff; }
-        .post-icons svg { width: 20px; height: 20px; cursor: pointer; padding: 8px; border-radius: 50%; transition: background 0.2s; }
-        .post-icons svg:hover { background: rgba(255, 255, 255, 0.1); }
-        .post-btn { background: #ffffff; color: #fff; border: none; padding: 8px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; opacity: 0.5; transition: opacity 0.2s; }
-        .post-btn.active { opacity: 1; }
-
-        /* 帖子 */
-        .post { padding: 16px; border-bottom: 1px solid #2f3336; display: flex; gap: 12px; cursor: pointer; transition: background 0.2s; }
-        .post:hover { background: #16181c; }
-        .post-content { flex: 1; min-width: 0; }
-        .post-header { display: flex; gap: 5px; margin-bottom: 2px; align-items: center; }
-        .post-name { font-weight: bold; cursor: pointer; }
-        .post-name:hover { text-decoration: underline; }
-        .post-handle, .post-time { color: #71767b; }
-        .post-time:hover { text-decoration: underline; }
-        .post-text { margin: 8px 0; line-height: 1.5; font-size: 15px; white-space: pre-wrap; word-wrap: break-word; }
-        .hashtag, .mention { color: #ffffff; cursor: pointer; }
-        .hashtag:hover, .mention:hover { text-decoration: underline; }
-        .post-image { width: 100%; border-radius: 16px; margin-top: 10px; border: 1px solid #2f3336; max-height: 400px; object-fit: cover; }
-        .post-actions-bar { display: flex; justify-content: space-between; max-width: 400px; margin-top: 10px; }
-        .action-item { display: flex; align-items: center; gap: 5px; color: #71767b; font-size: 13px; cursor: pointer; padding: 5px; border-radius: 50%; transition: all 0.2s; }
-        .action-item:hover { background: rgba(255, 255, 255, 0.1); }
-        .action-item.reply:hover { color: #ffffff; }
-        .action-item.retweet.retweeted { color: #00ba7c; }
-        .action-item.like.liked { color: #f91880; }
-        .action-item.like.liked svg { fill: #f91880; }
-        .action-item.like:hover { color: #f91880; }
-        .post-menu { color: #71767b; padding: 8px; border-radius: 50%; opacity: 0; transition: opacity 0.2s; margin-left: auto; }
-        .post:hover .post-menu { opacity: 1; }
-
-        /* 转发内容 */
-        .retweet-original { background: #16181c; border-radius: 16px; padding: 12px; margin-top: 10px; }
-        .retweet-original .post-name { font-size: 14px; }
-        .retweet-original .post-text { font-size: 14px; margin: 4px 0 0; }
-
-        /* 评论 */
-        .comments-section { display: none; padding: 12px 16px; border-bottom: 1px solid #2f3336; background: #0a0a0a; }
-        .comments-section.show { display: block; }
-        .comment { padding: 12px 0; display: flex; gap: 12px; font-size: 14px; border-bottom: 1px solid #2f3336; }
-        .comment:last-child { border-bottom: none; }
-        .comment .avatar { width: 36px; height: 36px; }
-        .comment-name { font-weight: bold; cursor: pointer; }
-        .comment-name:hover { text-decoration: underline; }
-        .comment-handle { color: #71767b; }
-        .comment-text { margin-top: 4px; }
-        .comment-input-wrap { display: flex; gap: 12px; margin-top: 12px; }
-        .comment-input-wrap input { flex: 1; background: #202327; border: 1px solid #2f3336; border-radius: 20px; padding: 10px 15px; color: #fff; font-size: 14px; outline: none; }
-        .comment-input-wrap input:focus { border-color: #ffffff; }
-        .comment-input-wrap button { background: #ffffff; border: none; padding: 8px 16px; border-radius: 20px; color: #fff; font-weight: bold; cursor: pointer; }
-
-        /* 右侧 */
-        .sidebar-right { width: 350px; padding: 20px; position: sticky; top: 0; height: 100vh; }
-        .search-box { position: relative; margin-bottom: 20px; }
-        .search-box input { width: 100%; background: #202327; border: none; padding: 12px 45px; border-radius: 25px; color: #fff; font-size: 15px; outline: none; }
-        .search-box input::placeholder { color: #71767b; }
-        .search-box svg { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); width: 18px; color: #71767b; }
-        .trends, .who-to-follow { background: #16181c; border-radius: 16px; padding: 15px; margin-bottom: 20px; }
-        .trends h2, .who-to-follow h2 { font-size: 20px; font-weight: bold; margin-bottom: 15px; }
-        .trend-item { padding: 10px 0; cursor: pointer; }
-        .trend-item:hover { background: #1c1f23; margin: 0 -15px; padding: 10px 15px; border-radius: 8px; }
-        .trend-category { font-size: 13px; color: #71767b; }
-        .trend-name { font-weight: bold; margin: 2px 0; }
-        .trend-posts { font-size: 13px; color: #71767b; }
-        .follow-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; }
-        .follow-item:hover { background: #1c1f23; margin: 0 -15px; padding: 10px 15px; border-radius: 8px; }
-        .follow-avatar { width: 40px; height: 40px; border-radius: 50%; cursor: pointer; }
-        .follow-info { flex: 1; }
-        .follow-name { font-weight: bold; font-size: 15px; cursor: pointer; }
-        .follow-name:hover { text-decoration: underline; }
-        .follow-handle { color: #71767b; font-size: 14px; }
-        .follow-btn { background: #fff; color: #000; border: none; padding: 6px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; cursor: pointer; }
-        .follow-btn.following { background: transparent; color: #fff; border: 1px solid #536471; }
-
-        /* Toast */
-        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); background: #00ba7c; color: #fff; padding: 12px 24px; border-radius: 30px; font-weight: bold; opacity: 0; transition: all 0.3s; z-index: 1000; }
-        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-        .toast.error { background: #f4212e; }
-
-        /* 加载 */
-        .loading { text-align: center; padding: 40px; color: #71767b; }
-        .loading-spinner { width: 24px; height: 24px; border: 3px solid #2f3336; border-top-color: #ffffff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* 移动端 */
-        @media (max-width: 1000px) { .sidebar-right { display: none; } }
-        @media (max-width: 700px) { 
-            .sidebar-left { width: 80px; }
-            .nav-item span, .tweet-btn span { display: none; }
-            .nav-item { justify-content: center; padding: 15px; }
-            .nav-item svg { margin-right: 0; }
-            .tweet-btn { width: 50px; height: 50px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
-            .user-menu-info { display: none; }
-            .user-menu { justify-content: center; }
-            .user-menu .avatar { margin-right: 0; }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>社交+直播平台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; min-height: 100vh; }
+    
+    .navbar { background: #fff; border-bottom: 1px solid #ddd; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    .navbar-brand { font-size: 20px; font-weight: bold; color: #e1306c; }
+    .navbar-links { display: flex; gap: 20px; }
+    .navbar-links a { text-decoration: none; color: #666; font-size: 14px; }
+    .navbar-links a:hover { color: #e1306c; }
+    
+    .container { max-width: 1200px; margin: 20px auto; display: grid; grid-template-columns: 250px 1fr 300px; gap: 20px; padding: 0 20px; }
+    
+    .sidebar { background: #fff; border-radius: 10px; padding: 20px; height: fit-content; }
+    .sidebar-menu-item { padding: 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 10px; color: #333; }
+    .sidebar-menu-item:hover { background: #f5f5f5; }
+    .sidebar-menu-item.active { background: #ffeef5; color: #e1306c; }
+    
+    .main { background: #fff; border-radius: 10px; overflow: hidden; }
+    .main-header { padding: 15px 20px; border-bottom: 1px solid #eee; font-weight: bold; font-size: 16px; }
+    
+    .post-create { padding: 20px; border-bottom: 1px solid #eee; display: flex; gap: 12px; }
+    .post-create textarea { width: 100%; border: none; resize: none; outline: none; font-size: 16px; min-height: 60px; }
+    .post-create-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+    .post-create-actions input { display: none; }
+    .btn { padding: 8px 20px; border-radius: 20px; border: none; cursor: pointer; font-weight: 500; }
+    .btn-primary { background: #e1306c; color: #fff; }
+    .btn-primary:hover { background: #c8235c; }
+    .btn-secondary { background: #eee; color: #333; }
+    
+    .post { padding: 20px; border-bottom: 1px solid #eee; display: flex; gap: 12px; }
+    .post-avatar { width: 48px; height: 48px; border-radius: 50%; background: #ddd; flex-shrink: 0; }
+    .post-content { flex: 1; }
+    .post-header { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+    .post-name { font-weight: bold; }
+    .post-username { color: #666; }
+    .post-time { color: #999; font-size: 13px; }
+    .post-text { margin: 8px 0; line-height: 1.5; }
+    .post-image { width: 100%; border-radius: 10px; margin-top: 10px; }
+    .post-actions { display: flex; gap: 30px; margin-top: 12px; }
+    .post-action { display: flex; align-items: center; gap: 6px; color: #666; cursor: pointer; }
+    .post-action:hover { color: #e1306c; }
+    
+    .right-sidebar { background: #fff; border-radius: 10px; padding: 20px; }
+    .right-sidebar h3 { font-size: 16px; margin-bottom: 15px; }
+    .live-card { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #eee; }
+    .live-thumb { width: 80px; height: 60px; background: #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; }
+    .live-info { flex: 1; }
+    .live-title { font-weight: 500; font-size: 14px; }
+    .live-viewer { font-size: 12px; color: #999; }
+    .live-badge { background: #e1306c; color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+    
+    .auth-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+    .auth-modal.show { display: flex; }
+    .auth-box { background: #fff; border-radius: 16px; padding: 30px; width: 400px; max-width: 90%; }
+    .auth-box h2 { text-align: center; margin-bottom: 20px; }
+    .auth-box input { width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    .auth-box .btn { width: 100%; margin-top: 10px; }
+    .auth-switch { text-align: center; margin-top: 15px; color: #666; font-size: 14px; }
+    .auth-switch span { color: #e1306c; cursor: pointer; }
+    
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px); background: #333; color: #fff; padding: 12px 24px; border-radius: 8px; opacity: 0; transition: 0.3s; z-index: 2000; }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    .toast.success { background: #4caf50; }
+    .toast.error { background: #f44336; }
+    
+    @media (max-width: 900px) {
+      .container { grid-template-columns: 1fr; }
+      .right-sidebar { display: none; }
+    }
+  </style>
 </head>
 <body>
-    <div class="toast" id="toast">操作成功</div>
+  <nav class="navbar">
+    <div class="navbar-brand">🌐 Social+Live</div>
+    <div class="navbar-links">
+      <a href="#" onclick="showPage('home')">首页</a>
+      <a href="#" onclick="showPage('live')">直播</a>
+      <a href="#" onclick="showPage('profile')" id="profileLink" style="display:none">我的</a>
+      <a href="#" onclick="showAuthModal()" id="loginLink">登录</a>
+    </div>
+  </nav>
 
-    <!-- 登录/注册弹窗 -->
-    <div class="modal-overlay" id="authModal">
-        <div class="modal" style="position: relative;">
-            <span class="close" onclick="closeAuthModal()">×</span>
-            <h2 id="authTitle">登录</h2>
-            <div id="loginForm">
-                <input type="email" id="loginEmail" placeholder="邮箱">
-                <input type="password" id="loginPassword" placeholder="密码">
-                <button class="btn" onclick="login()">登录</button>
-                <span class="link" onclick="showRegister()">没有账号？立即注册</span>
-            </div>
-            <div id="registerForm" style="display: none;">
-                <input type="text" id="regUsername" placeholder="用户名">
-                <input type="text" id="regDisplayName" placeholder="显示名称">
-                <input type="email" id="regEmail" placeholder="邮箱">
-                <input type="password" id="regPassword" placeholder="密码（至少6位）">
-                <button class="btn" onclick="register()">注册</button>
-                <span class="link" onclick="showLogin()">已有账号？立即登录</span>
-            </div>
-        </div>
+  <div class="container">
+    <div class="sidebar">
+      <div class="sidebar-menu-item active" onclick="loadPosts()">
+        🏠 首页
+      </div>
+      <div class="sidebar-menu-item" onclick="showPage('explore')">
+        🔍 探索
+      </div>
+      <div class="sidebar-menu-item" onclick="showPage('live')">
+        📺 直播
+      </div>
+      <div class="sidebar-menu-item" onclick="showPage('notifications')">
+        🔔 通知
+      </div>
     </div>
 
-    <div class="container">
-        <!-- 左侧导航 -->
-        <div class="sidebar-left">
-            <div class="logo" onclick="goHome()">🐦</div>
-            <div class="nav-item active">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.591 7.146L12.52 1.157c-.316-.21-.724-.21-1.04 0l-9.071 5.99c-.26.173-.409.456-.409.757v13.183c0 .502.418.913.929.913H10c.511 0 .929-.41.929-.913v-7.075h3.909v7.075c0 .502.417.913.928.913h6.285c.511 0 .928-.41.928-.913V7.904c0-.301-.158-.584-.408-.758z"/></svg>
-                <span>首页</span>
+    <div class="main">
+      <div class="main-header">首页</div>
+      <div class="post-create" id="postCreateBox" style="display:none">
+        <div class="post-avatar" id="myAvatar" style="background: linear-gradient(135deg, #e1306c, #fd5949);"></div>
+        <div style="flex:1">
+          <textarea id="postContent" placeholder="分享新鲜事..."></textarea>
+          <div class="post-create-actions">
+            <div>
+              <button class="btn btn-secondary" onclick="document.getElementById('postImage').click()">🖼️ 图片</button>
+              <input type="file" id="postImage" accept="image/*" onchange="handleImage(this)">
             </div>
-            <div class="nav-item">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 8.719L7.836 14.303C6.74 14.768 5.818 15 5.075 15c-.836 0-1.445-.295-1.819-.884-.485-.76-.273-1.982.55-3.272.494-.754 1.122-1.446 1.734-2.108-.144.234-1.415 2.349-.025 3.345.275.2.666.298 1.147.298.386 0 .829-.072 1.307-.39.81-.536 1.67-1.48 2.445-2.602.182.312.286.689.286 1.114 0 .914-.628 1.847-1.608 2.357L19.91 9.5c.472-.318.783-.862.783-1.459V8.313c0-.501-.277-.95-.705-1.164z"/></svg>
-                <span>探索</span>
-            </div>
-            <div class="nav-item">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01z"/></svg>
-                <span>通知</span>
-            </div>
-            <div class="nav-item">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/></svg>
-                <span>信息</span>
-            </div>
-            <div class="nav-item" id="profileNav" style="display: none;">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.651 19h12.698c-.337-4.422-4.06-8-8.654-8-4.595 0-8.318 3.578-8.654 8zM12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2z"/></svg>
-                <span>个人资料</span>
-            </div>
-            <button class="tweet-btn" onclick="openPostBox()">发帖</button>
-
-            <!-- 用户菜单 -->
-            <div class="user-menu" id="userMenu" style="display: none;" onclick="openAuthModal()">
-                <div class="avatar" id="menuAvatar"></div>
-                <div class="user-menu-info">
-                    <div class="user-menu-name" id="menuName">用户</div>
-                    <div class="user-menu-handle" id="menuHandle">@handle</div>
-                </div>
-            </div>
-            <div class="nav-item" id="loginBtn" onclick="openAuthModal()">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-                <span>登录</span>
-            </div>
+            <button class="btn btn-primary" onclick="createPost()">发布</button>
+          </div>
         </div>
-
-        <!-- 中间内容 -->
-        <div class="main-content">
-            <div class="header">
-                <h1>首页</h1>
-                <button class="refresh-btn" onclick="loadPosts()">刷新</button>
-            </div>
-
-            <!-- 发帖框 -->
-            <div class="post-box" id="postBox">
-                <div class="avatar" id="postAvatar" onclick="goToProfile()"></div>
-                <div class="post-input">
-                    <textarea id="postText" placeholder="有什么新鲜事？" oninput="checkPostContent()"></textarea>
-                    <div class="post-actions">
-                        <div class="post-icons">
-                            <svg viewBox="0 0 24 24" fill="currentColor" title="图片" onclick="document.getElementById('imageInput').click()"><path d="M3 5.5C3 4.119 4.119 3 5.5 3h13C19.881 3 21 4.119 21 5.5v13c0 1.381-1.119 2.5-2.5 2.5h-13C4.119 21 3 19.881 3 18.5v-13z"/></svg>
-                            <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageSelect(this)">
-                        </div>
-                        <button class="post-btn" id="postBtn" onclick="submitPost()">发帖</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 帖子列表 -->
-            <div id="postsContainer">
-                <div class="loading"><div class="loading-spinner"></div></div>
-            </div>
-        </div>
-
-        <!-- 右侧 -->
-        <div class="sidebar-right">
-            <div class="search-box">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.25 3.75c-3.59 0-6.5 2.91-6.5 6.5s2.91 6.5 6.5 6.5c1.795 0 3.419-.726 4.596-1.904 1.178-1.177 1.904-2.801 1.904-4.596 0-3.59-2.91-6.5-6.5-6.5z"/></svg>
-                <input type="text" placeholder="搜索" oninput="searchUsers(this.value)">
-            </div>
-
-            <div class="trends">
-                <h2>热搜榜</h2>
-                <div class="trend-item" onclick="insertHashtag('人工智能')">
-                    <div class="trend-category">技术 · 热门</div>
-                    <div class="trend-name">#人工智能</div>
-                    <div class="trend-posts">2.3亿 posts</div>
-                </div>
-                <div class="trend-item" onclick="insertHashtag('ChatGPT5')">
-                    <div class="trend-category">科技</div>
-                    <div class="trend-name">#ChatGPT5</div>
-                    <div class="trend-posts">890万 posts</div>
-                </div>
-                <div class="trend-item" onclick="insertHashtag('新电影')">
-                    <div class="trend-category">娱乐</div>
-                    <div class="trend-name">#新电影上映</div>
-                    <div class="trend-posts">567万 posts</div>
-                </div>
-            </div>
-
-            <div class="who-to-follow">
-                <h2>推荐关注</h2>
-                <div id="suggestions"></div>
-            </div>
-        </div>
+      </div>
+      <div id="postsList">
+        <!-- Posts will be loaded here -->
+      </div>
     </div>
 
-    <script>
-        // 全局状态
-        let currentUser = null;
-        let token = localStorage.getItem('token');
-        let selectedImage = null;
+    <div class="right-sidebar">
+      <h3>🔴 正在直播</h3>
+      <div id="liveList">
+        <div style="color: #999; font-size: 14px;">暂无直播</div>
+      </div>
+    </div>
+  </div>
 
-        const API_URL = '';
+  <!-- Auth Modal -->
+  <div class="auth-modal" id="authModal">
+    <div class="auth-box">
+      <h2 id="authTitle">登录</h2>
+      <div id="loginForm">
+        <input type="email" id="loginEmail" placeholder="邮箱">
+        <input type="password" id="loginPassword" placeholder="密码">
+        <button class="btn btn-primary" onclick="login()">登录</button>
+        <div class="auth-switch">没有账号？<span onclick="showRegister()">注册</span></div>
+      </div>
+      <div id="registerForm" style="display:none">
+        <input type="text" id="regUsername" placeholder="用户名">
+        <input type="text" id="regDisplayName" placeholder="显示名称">
+        <input type="email" id="regEmail" placeholder="邮箱">
+        <input type="password" id="regPassword" placeholder="密码（至少6位）">
+        <button class="btn btn-primary" onclick="register()">注册</button>
+        <div class="auth-switch">已有账号？<span onclick="showLogin()">登录</span></div>
+      </div>
+      <div class="auth-switch" style="margin-top:15px"><span onclick="closeAuthModal()">关闭</span></div>
+    </div>
+  </div>
 
-        // 初始化
-        document.addEventListener('DOMContentLoaded', async () => {
-            if (token) {
-                await checkAuth();
-            }
-            await loadPosts();
-            loadSuggestions();
-        });
+  <div class="toast" id="toast"></div>
 
-        // API 请求
-        async function apiCall(endpoint, options = {}) {
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-            
-            const response = await fetch(`${API_URL}${endpoint}`, {
-                ...options,
-                headers: { ...headers, ...options.headers }
-            });
-            
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.error || '请求失败');
-            }
-            return data;
+  <script>
+    const API = 'https://twitter-lite-15zm.onrender.com/api';
+    let currentUser = null;
+    let token = localStorage.getItem('token');
+
+    // Initialize
+    init();
+
+    function init() {
+      if (token) checkAuth();
+      loadPosts();
+      loadLive();
+    }
+
+    // Auth
+    async function checkAuth() {
+      try {
+        const res = await fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok) {
+          const data = await res.json();
+          currentUser = data.user;
+          updateUI();
         }
+      } catch (e) {
+        console.log('Not logged in');
+      }
+    }
 
-        // 检查登录状态
-        async function checkAuth() {
-            try {
-                const data = await apiCall('/api/auth/me');
-                currentUser = data.user;
-                updateUI();
-            } catch (error) {
-                token = null;
-                localStorage.removeItem('token');
-            }
+    function updateUI() {
+      if (currentUser) {
+        document.getElementById('loginLink').style.display = 'none';
+        document.getElementById('profileLink').style.display = 'block';
+        document.getElementById('postCreateBox').style.display = 'flex';
+        document.getElementById('myAvatar').style.background = `url(${currentUser.avatar}) center/cover`;
+      }
+    }
+
+    function showAuthModal() { document.getElementById('authModal').classList.add('show'); }
+    function closeAuthModal() { document.getElementById('authModal').classList.remove('show'); }
+    function showRegister() { document.getElementById('loginForm').style.display = 'none'; document.getElementById('registerForm').style.display = 'block'; document.getElementById('authTitle').textContent = '注册'; }
+    function showLogin() { document.getElementById('registerForm').style.display = 'none'; document.getElementById('loginForm').style.display = 'block'; document.getElementById('authTitle').textContent = '登录'; }
+
+    async function login() {
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      
+      const res = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        token = data.token;
+        currentUser = data.user;
+        localStorage.setItem('token', token);
+        updateUI();
+        closeAuthModal();
+        showToast('登录成功', 'success');
+        loadPosts();
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    async function register() {
+      const username = document.getElementById('regUsername').value;
+      const display_name = document.getElementById('regDisplayName').value;
+      const email = document.getElementById('regEmail').value;
+      const password = document.getElementById('regPassword').value;
+      
+      const res = await fetch(`${API}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, display_name, email, password })
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        token = data.token;
+        currentUser = data.user;
+        localStorage.setItem('token', token);
+        updateUI();
+        closeAuthModal();
+        showToast('注册成功', 'success');
+      } else {
+        showToast(data.error, 'error');
+      }
+    }
+
+    // Posts
+    async function loadPosts() {
+      const res = await fetch(`${API}/posts`);
+      const data = await res.json();
+      
+      if (data.posts && data.posts.length > 0) {
+        document.getElementById('postsList').innerHTML = data.posts.map(post => `
+          <div class="post">
+            <div class="post-avatar" style="background: url(${post.avatar}) center/cover;"></div>
+            <div class="post-content">
+              <div class="post-header">
+                <span class="post-name">${post.display_name || post.username}</span>
+                <span class="post-username">@${post.username}</span>
+                <span class="post-time">· ${formatTime(post.created_at)}</span>
+              </div>
+              <div class="post-text">${post.content}</div>
+              ${post.image_url ? `<img class="post-image" src="${API.replace('/api', '')}${post.image_url}" alt="">` : ''}
+              <div class="post-actions">
+                <div class="post-action" onclick="likePost(${post.id})">❤️ ${post.likes_count || 0}</div>
+                <div class="post-action" onclick="retweetPost(${post.id})">🔄 ${post.retweets_count || 0}</div>
+                <div class="post-action" onclick="commentPost(${post.id})">💬 ${post.comments_count || 0}</div>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        <div class="post" style="text-align:center;color:#999">暂无内容</div>
+      }
+    }
+
+    async function createPost() {
+      if (!token) return showAuthModal();
+      
+      const content = document.getElementById('postContent').value;
+      if (!content.trim()) return showToast('请输入内容', 'error');
+      
+      const formData = new FormData();
+      formData.append('content', content);
+      
+      const fileInput = document.getElementById('postImage');
+      if (fileInput.files[0]) formData.append('media', fileInput.files[0]);
+      
+      const res = await fetch(`${API}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+      
+      if (res.ok) {
+        document.getElementById('postContent').value = '';
+        fileInput.value = '';
+        showToast('发布成功', 'success');
+        loadPosts();
+      } else {
+        showToast('发布失败', 'error');
+      }
+    }
+
+    function handleImage(input) {
+      if (input.files[0]) showToast('已选择图片: ' + input.files[0].name, 'success');
+    }
+
+    async function likePost(id) {
+      if (!token) return showAuthModal();
+      await fetch(`${API}/posts/${id}/like`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      loadPosts();
+    }
+
+    async function retweetPost(id) {
+      if (!token) return showAuthModal();
+      await fetch(`${API}/posts/${id}/retweet`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      loadPosts();
+    }
+
+    async function commentPost(id) {
+      showToast('评论功能开发中', 'success');
+    }
+
+    // Live
+    async function loadLive() {
+      try {
+        const res = await fetch(`${API}/live/list`);
+        const data = await res.json();
+        
+        if (data.rooms && data.rooms.length > 0) {
+          document.getElementById('liveList').innerHTML = data.rooms.map(room => `
+            <div class="live-card">
+              <div class="live-thumb">🔴 LIVE</div>
+              <div class="live-info">
+                <div class="live-title">${room.title}</div>
+                <div class="live-viewer">@${room.username} · 🔴 ${room.viewer_count || 0}人观看</div>
+              </div>
+            </div>
+          `).join('');
         }
+      } catch (e) {}
+    }
 
-        // 更新 UI
-        function updateUI() {
-            const loginBtn = document.getElementById('loginBtn');
-            const userMenu = document.getElementById('userMenu');
-            const profileNav = document.getElementById('profileNav');
-            const postAvatar = document.getElementById('postAvatar');
+    // Utils
+    function formatTime(date) {
+      const d = new Date(date);
+      const now = new Date();
+      const diff = (now - d) / 1000;
+      if (diff < 60) return '刚刚';
+      if (diff < 3600) return Math.floor(diff/60) + '分钟';
+      if (diff < 86400) return Math.floor(diff/3600) + '小时';
+      return Math.floor(diff/86400) + '天';
+    }
 
-            if (currentUser) {
-                loginBtn.style.display = 'none';
-                userMenu.style.display = 'flex';
-                profileNav.style.display = 'flex';
-                
-                document.getElementById('menuName').textContent = currentUser.display_name || currentUser.username;
-                document.getElementById('menuHandle').textContent = '@' + currentUser.username;
-                document.getElementById('menuAvatar').style.background = `url(${currentUser.avatar}) center/cover`;
-                postAvatar.style.background = `url(${currentUser.avatar}) center/cover`;
-                
-                profileNav.onclick = () => goToProfile();
-            } else {
-                loginBtn.style.display = 'flex';
-                userMenu.style.display = 'none';
-                profileNav.style.display = 'none';
-                postAvatar.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-            }
-        }
+    function showToast(msg, type = '') {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.className = 'toast show ' + type;
+      setTimeout(() => toast.classList.remove('show'), 2000);
+    }
 
-        // 加载帖子
-        async function loadPosts() {
-            try {
-                const data = await apiCall('/api/posts');
-                renderPosts(data.posts);
-            } catch (error) {
-                showToast('加载失败: ' + error.message, true);
-            }
-        }
-
-        // 渲染帖子
-        function renderPosts(posts) {
-            const container = document.getElementById('postsContainer');
-            
-            if (posts.length === 0) {
-                container.innerHTML = '<div class="loading">暂无帖子，发一条吧！</div>';
-                return;
-            }
-
-            container.innerHTML = posts.map(post => `
-                <div class="post" onclick="event.stopPropagation()">
-                    <div class="avatar" style="background: url(${post.avatar}) center/cover;" onclick="viewUser('${post.username}')"></div>
-                    <div class="post-content">
-                        <div class="post-header">
-                            <span class="post-name" onclick="viewUser('${post.username}')">${post.display_name || post.username}</span>
-                            <span class="post-handle">@${post.username}</span>
-                            <span class="post-time">· ${formatTime(post.created_at)}</span>
-                            <div class="post-menu" onclick="showToast('更多选项')">···</div>
-                        </div>
-                        <div class="post-text">${parseText(post.content)}</div>
-                        ${post.image_url ? `<img class="post-image" src="${API_URL}${post.image_url}" alt="图片">` : ''}
-                        ${post.retweet_post ? `
-                            <div class="retweet-original">
-                                <span class="post-name">@${post.retweet_post.username}</span>
-                                <div class="post-text">${parseText(post.retweet_post.content)}</div>
-                            </div>
-                        ` : ''}
-                        <div class="post-actions-bar">
-                            <div class="action-item reply" onclick="toggleComments(${post.id})">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01z"/></svg>
-                                <span>${post.comments_count || 0}</span>
-                            </div>
-                            <div class="action-item retweet ${post.retweeted_by_me ? 'retweeted' : ''}" onclick="handleRetweet(${post.id})">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="${post.retweeted_by_me ? '#00ba7c' : 'currentColor'}"><path d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88z"/></svg>
-                                <span>${post.retweets_count || 0}</span>
-                            </div>
-                            <div class="action-item like ${post.liked_by_me ? 'liked' : ''}" onclick="handleLike(${post.id})">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="${post.liked_by_me ? '#f91880' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M16.697 5.5c-1.222-.06-2.679.51-3.89 2.16l-.805 1.09-.806-1.09C9.984 6.01 8.526 5.44 7.304 5.5c-1.243.07-2.349.78-2.91 1.91-.552 1.12-.633 2.78.479 4.82 1.074 1.97 3.257 4.27 7.129 6.61 3.87-2.34 6.052-4.64 7.126-6.61 1.111-2.04 1.03-3.7.477-4.82-.561-1.13-1.666-1.84-2.908-1.91z"/></svg>
-                                <span>${post.likes_count || 0}</span>
-                            </div>
-                            <div class="action-item" onclick="showToast('查看统计')">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8.75 21V3h2v18h-2zM18 21V8.5h2V21h-2zM4 21l.004-10h2L6 21H4zm9.248 0v-7h2v7h-2z"/></svg>
-                                <span>${post.views > 10000 ? (post.views/10000).toFixed(1) + '万' : post.views}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="comments-section" id="comments-${post.id}">
-                    <div class="comments-list" id="comments-list-${post.id}"></div>
-                    ${currentUser ? `
-                        <div class="comment-input-wrap">
-                            <input type="text" placeholder="添加评论..." onkeypress="submitComment(event, ${post.id})">
-                            <button onclick="submitCommentByBtn(${post.id})">回复</button>
-                        </div>
-                    ` : ''}
-                </div>
-            `).join('');
-        }
-
-        // 解析文字
-        function parseText(text) {
-            if (!text) return '';
-            return text.replace(/#(\w+)/g, '<span class="hashtag" onclick="insertHashtag(\'$1\')">#$1</span>')
-                       .replace(/@(\w+)/g, '<span class="mention" onclick="viewUser(\'$1\')">@$1</span>');
-        }
-
-        // 格式化时间
-        function formatTime(dateStr) {
-            const date = new Date(dateStr);
-            const now = new Date();
-            const diff = (now - date) / 1000;
-            
-            if (diff < 60) return '刚刚';
-            if (diff < 3600) return Math.floor(diff/60) + '分钟';
-            if (diff < 86400) return Math.floor(diff/3600) + '小时';
-            if (diff < 604800) return Math.floor(diff/86400) + '天';
-            return date.toLocaleDateString('zh-CN');
-        }
-
-        // 点赞
-        async function handleLike(postId) {
-            if (!currentUser) { openAuthModal(); return; }
-            try {
-                await apiCall(`/api/posts/${postId}/like`, { method: 'POST' });
-                await loadPosts();
-            } catch (error) {
-                showToast(error.message, true);
-            }
-        }
-
-        // 转发
-        async function handleRetweet(postId) {
-            if (!currentUser) { openAuthModal(); return; }
-            try {
-                await apiCall(`/api/posts/${postId}/retweet`, { method: 'POST' });
-                await loadPosts();
-            } catch (error) {
-                showToast(error.message, true);
-            }
-        }
-
-        // 切换评论
-        async function toggleComments(postId) {
-            const section = document.getElementById(`comments-${postId}`);
-            const list = document.getElementById(`comments-list-${postId}`);
-            
-            if (section.classList.contains('show')) {
-                section.classList.remove('show');
-                return;
-            }
-            
-            try {
-                const data = await apiCall(`/api/posts/${postId}/comments`);
-                list.innerHTML = data.comments.map(c => `
-                    <div class="comment">
-                        <div class="avatar" style="background: url(${c.avatar}) center/cover;"></div>
-                        <div>
-                            <span class="comment-name" onclick="viewUser('${c.username}')">${c.display_name || c.username}</span>
-                            <span class="comment-handle">@${c.username}</span>
-                            <div class="comment-text">${parseText(c.content)}</div>
-                        </div>
-                    </div>
-                `).join('');
-                section.classList.add('show');
-            } catch (error) {
-                showToast(error.message, true);
-            }
-        }
-
-        // 提交评论
-        async function submitComment(event, postId) {
-            if (event.key === 'Enter') {
-                const input = event.target;
-                await addComment(postId, input.value);
-            }
-        }
-
-        async function submitCommentByBtn(postId) {
-            const input = document.querySelector(`#comments-${postId} input`);
-            await addComment(postId, input.value);
-        }
-
-        async function addComment(postId, text) {
-            if (!text.trim()) return;
-            try {
-                await apiCall(`/api/posts/${postId}/comments`, {
-                    method: 'POST',
-                    body: JSON.stringify({ content: text })
-                });
-                toggleComments(postId);
-                await loadPosts();
-            } catch (error) {
-                showToast(error.message, true);
-            }
-        }
-
-        // 发帖
-        async function submitPost() {
-            if (!currentUser) { openAuthModal(); return; }
-            
-            const content = document.getElementById('postText').value.trim();
-            if (!content) { showToast('请输入内容', true); return; }
-
-            try {
-                const formData = new FormData();
-                formData.append('content', content);
-                if (selectedImage) {
-                    formData.append('image', selectedImage);
-                }
-
-                const headers = {};
-                if (token) headers['Authorization'] = `Bearer ${token}`;
-
-                const response = await fetch(`${API_URL}/api/posts`, {
-                    method: 'POST',
-                    body: formData,
-                    headers
-                });
-
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.error);
-
-                document.getElementById('postText').value = '';
-                selectedImage = null;
-                document.getElementById('imageInput').value = '';
-                checkPostContent();
-                await loadPosts();
-                showToast('发帖成功');
-            } catch (error) {
-                showToast(error.message, true);
-            }
-        }
-
-        // 选择图片
-        function handleImageSelect(input) {
-            if (input.files && input.files[0]) {
-                selectedImage = input.files[0];
-                showToast('已选择图片: ' + selectedImage.name);
-            }
-        }
-
-        // 检查发帖内容
-        function checkPostContent() {
-            const text = document.getElementById('postText').value;
-            const btn = document.getElementById('postBtn');
-            btn.classList.toggle('active', text.trim().length > 0);
-        }
-
-        // 插入话题
-        function insertHashtag(tag) {
-            if (!currentUser) { openAuthModal(); return; }
-            const textarea = document.getElementById('postText');
-            textarea.value += ' #' + tag;
-            checkPostContent();
-            textarea.focus();
-            showToast('添加 #' + tag);
-        }
-
-        // 打开发帖框
-        function openPostBox() {
-            if (!currentUser) { openAuthModal(); return; }
-            document.getElementById('postText').focus();
-        }
-
-        // 加载推荐关注
-        async function loadSuggestions() {
-            try {
-                // 随机获取一些用户作为推荐
-                const response = await fetch(`${API_URL}/api/users/search/a`);
-                const data = await response.json();
-                const container = document.getElementById('suggestions');
-                
-                if (data.users && data.users.length > 0) {
-                    container.innerHTML = data.users.slice(0, 3).map(user => `
-                        <div class="follow-item">
-                            <div class="follow-avatar" style="background: url(${user.avatar}) center/cover;" onclick="viewUser('${user.username}')"></div>
-                            <div class="follow-info">
-                                <div class="follow-name" onclick="viewUser('${user.username}')">${user.display_name || user.username}</div>
-                                <div class="follow-handle">@${user.username}</div>
-                            </div>
-                            <button class="follow-btn" onclick="event.stopPropagation(); followUser(${user.id}, this)">关注</button>
-                        </div>
-                    `).join('');
-                }
-            } catch (error) {
-                console.log('No suggestions');
-            }
-        }
-
-        // 关注用户
-        async function followUser(userId, btn) {
-            if (!currentUser) { openAuthModal(); return; }
-            try {
-                const data = await apiCall(`/api/users/${userId}/follow`, { method: 'POST' });
-                btn.classList.toggle('following');
-                btn.textContent = data.following ? '已关注' : '关注';
-                showToast(data.message);
-            } catch (error) {
-                showToast(error.message, true);
-            }
-        }
-
-        // 搜索用户
-        async function searchUsers(query) {
-            if (!query) return;
-            try {
-                const data = await apiCall(`/api/users/search/${encodeURIComponent(query)}`);
-                console.log('Search results:', data.users);
-            } catch (error) {
-                console.log('Search error:', error);
-            }
-        }
-
-        // 页面跳转
-        function goHome() {
-            loadPosts();
-        }
-
-        function goToProfile() {
-            if (currentUser) {
-                showToast('个人资料页面开发中');
-            } else {
-                openAuthModal();
-            }
-        }
-
-        function viewUser(username) {
-            showToast('查看 @' + username + ' 的主页');
-        }
-
-        // ===== 认证 =====
-        function openAuthModal() {
-            document.getElementById('authModal').classList.add('show');
-        }
-
-        function closeAuthModal() {
-            document.getElementById('authModal').classList.remove('show');
-        }
-
-        function showLogin() {
-            document.getElementById('loginForm').style.display = 'block';
-            document.getElementById('registerForm').style.display = 'none';
-            document.getElementById('authTitle').textContent = '登录';
-        }
-
-        function showRegister() {
-            document.getElementById('loginForm').style.display = 'none';
-            document.getElementById('registerForm').style.display = 'block';
-            document.getElementById('authTitle').textContent = '注册';
-        }
-
-        async function login() {
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-
-            if (!email || !password) { showToast('请填写所有字段', true); return; }
-
-            try {
-                const data = await apiCall('/api/auth/login', {
-                    method: 'POST',
-                    body: JSON.stringify({ email, password })
-                });
-
-                token = data.token;
-                localStorage.setItem('token', token);
-                currentUser = data.user;
-                updateUI();
-                closeAuthModal();
-                await loadPosts();
-                showToast('登录成功');
-            } catch (error) {
-                showToast(error.message, true);
-            }
-        }
-
-        async function register() {
-            const username = document.getElementById('regUsername').value;
-            const display_name = document.getElementById('regDisplayName').value;
-            const email = document.getElementById('regEmail').value;
-            const password = document.getElementById('regPassword').value;
-
-            if (!username || !email || !password) { showToast('请填写所有必填字段', true); return; }
-
-            try {
-                const data = await apiCall('/api/auth/register', {
-                    method: 'POST',
-                    body: JSON.stringify({ username, display_name, email, password })
-                });
-
-                token = data.token;
-                localStorage.setItem('token', token);
-                currentUser = data.user;
-                updateUI();
-                closeAuthModal();
-                showToast('注册成功');
-            } catch (error) {
-                showToast(error.message, true);
-            }
-        }
-
-        // Toast 提示
-        function showToast(message, isError = false) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.className = 'toast show' + (isError ? ' error' : '');
-            setTimeout(() => { toast.classList.remove('show'); }, 2000);
-        }
-    </script>
+    function showPage(page) {
+      showToast('页面: ' + page);
+    }
+  </script>
 </body>
 </html>

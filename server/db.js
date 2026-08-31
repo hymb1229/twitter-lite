@@ -1,20 +1,33 @@
-const Database = require('better-sqlite3');
+const { Low } = require('lowdb');
+const { JSONFile } = require('lowdb/node');
 const path = require('path');
 const fs = require('fs');
 
-const dbPath = path.join(__dirname, '../data/twitter.db');
-
-// 确保 data 目录存在
-const dataDir = path.dirname(dbPath);
+const dataDir = path.join(__dirname, '../data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const db = new Database(dbPath);
+const file = path.join(dataDir, 'twitter.json');
 
-// 启用外键
-db.pragma('foreign_keys = ON');
+const defaultData = {
+  users: [],
+  posts: [],
+  likes: [],
+  comments: [],
+  follows: []
+};
 
-console.log('✅ Connected to SQLite database');
+const adapter = new JSONFile(file, defaultData);
+const db = new Low(adapter, defaultData);
+
+// 初始化数据库
+db.read().then(() => {
+  if (!db.data) {
+    db.data = defaultData;
+    db.write();
+  }
+  console.log('✅ Database connected (lowdb)');
+});
 
 module.exports = db;

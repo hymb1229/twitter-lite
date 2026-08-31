@@ -19,8 +19,10 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: '密码至少6位' });
     }
 
+    await db.read();
+    
     // 检查用户是否存在
-    const existingUser = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username, email);
+    const existingUser = db.data.users.find(u => u.username === username || u.email === email);
     if (existingUser) {
       return res.status(400).json({ error: '用户名或邮箱已被使用' });
     }
@@ -30,16 +32,23 @@ router.post('/register', async (req, res) => {
 
     // 创建用户
     const avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
-    const stmt = db.prepare(
-      `INSERT INTO users (username, email, password, display_name, avatar) VALUES (?, ?, ?, ?, ?)`
-    );
-    const result = stmt.run(username, email, hashedPassword, display_name || username, avatar);
+    const newUser = {
+      id: db.data.users.length,
+      username,
+      email,
+      password: hashedPassword,
+      display_name: display_name || username,
+      bio: '',
+      avatar,
+      created_at: new Date().toISOString()
+    };
 
-    const user = db.prepare('SELECT id, username, email, display_name, bio, avatar, created_at FROM users WHERE id = ?').get(result.lastInsertRowid);
+    db.data.users.push(newUser);
+    await db.write();
 
     // 生成 Token
     const token = jwt.sign(
-      { userId: user.id, username: user.username },
+      { userId: newUser.id, username: newUser.username },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -47,7 +56,7 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       message: '注册成功',
       token,
-      user
+      user: newUser
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -64,7 +73,9 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: '请输入邮箱和密码' });
     }
 
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    await db.read();
+    const user = db.data.users.find(u => u.email === email);
+    
     if (!user) {
       return res.status(400).json({ error: '邮箱或密码错误' });
     }
@@ -83,15 +94,7 @@ router.post('/login', async (req, res) => {
     res.json({
       message: '登录成功',
       token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        display_name: user.display_name,
-        bio: user.bio,
-        avatar: user.avatar,
-        created_at: user.created_at
-      }
+      user
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -100,22 +103,29 @@ router.post('/login', async (req, res) => {
 });
 
 // 获取当前用户
-router.get('/me', authenticateToken, (req, res) => {
-  res.json({ user: req.user });
+router.get('/me', authenticateToken, async (req, res) => {
+  await db.read();
+  const user = db.data.users.find(u => u.id === req.user.id);
+  res.json({ user });
 });
 
 // 更新个人资料
-router.put('/profile', authenticateToken, (req, res) => {
+router.put('/profile', authenticateToken, async (req, res) => {
   try {
     const { display_name, bio, avatar } = req.body;
     
-    const stmt = db.prepare(
-      `UPDATE users SET display_name = COALESCE(?, display_name), bio = COALESCE(?, bio), avatar = COALESCE(?, avatar), updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-    );
-    stmt.run(display_name, bio, avatar, req.user.id);
-
-    const user = db.prepare('SELECT id, username, email, display_name, bio, avatar, created_at FROM users WHERE id = ?').get(req.user.id);
-    res.json({ user, message: '资料更新成功' });
+    await db.read();
+    const userIndex = db.data.users.findIndex(u => u.id === req.user.id);
+    
+    if (userIndex !== -1) {
+      db.data.users[userIndex].display_name = display_name || db.data.users[userIndex].display_name;
+      db.data.users[userIndex].bio = bio || db.data.users[userIndex].bio;
+      db.data.users[userIndex].avatar = avatar || db.data.users[userIndex].avatar;
+      await db.write();
+      res.json({ user: db.data.users[userIndex], message: '资料更新成功' });
+    } else {
+      res.status(404).json({ error: '用户不存在' });
+    }
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({ error: '服务器错误' });

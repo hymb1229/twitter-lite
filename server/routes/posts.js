@@ -9,61 +9,54 @@ const router = express.Router();
 
 // 配置 multer
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../../uploads'));
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${uuidv4()}${ext}`);
-  }
+  destination: (req, file, cb) => cb(null, path.join(__dirname, '../../uploads')),
+  filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`)
 });
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const ext = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mime = allowedTypes.test(file.mimetype);
-    if (ext && mime) cb(null, true);
-    else cb(new Error('只支持图片文件'));
-  }
-});
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
-// 获取时间线帖子
-router.get('/', optionalAuth, (req, res) => {
+// 获取帖子
+router.get('/', optionalAuth, async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const offset = (page - 1) * limit;
+    await db.read();
     const userId = req.user ? req.user.id : null;
-
-    const posts = db.prepare(`
-      SELECT 
-        p.id, p.content, p.image_url, p.retweet_from, p.created_at,
-        u.id as user_id, u.username, u.display_name, u.avatar,
-        (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as likes_count,
-        (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count,
-        (SELECT COUNT(*) FROM posts WHERE retweet_from = p.id) as retweets_count,
-        (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as liked_by_me,
-        (SELECT COUNT(*) FROM posts WHERE retweet_from = p.id AND user_id = ?) as retweeted_by_me
-      FROM posts p
-      JOIN users u ON p.user_id = u.id
-      WHERE p.retweet_from IS NULL
-      ORDER BY p.created_at DESC
-      LIMIT ? OFFSET ?
-    `).all(userId, userId, limit, offset);
-
-    // 获取转发原帖
-    for (let post of posts) {
-      if (post.retweet_from) {
-        const retweetPost = db.prepare(
-          `SELECT p.id, p.content, p.image_url, p.created_at, u.username, u.display_name, u.avatar
-           FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = ?`
-        ).get(post.retweet_from);
-        post.retweet_post = retweetPost || null;
-      }
-    }
+    
+    // 获取非转发的帖子
+    const posts = db.data.posts
+      .filter(p => !p.retweet_from)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .map(post => {
+        const user = db.data.users[post.user_id];
+        const likes_count = db.data.likes.filter(l => l.post_id === post.id).length;
+        const comments_count = db.data.comments.filter(c => c.post_id === post.id).length;
+        const retweets_count = db.data.posts.filter(p => p.retweet_from === post.id).length;
+        const liked_by_me = userId ? db.data.likes.some(l => l.post_id === post.id && l.user_id === userId) : false;
+        const retweeted_by_me = userId ? db.data.posts.some(p => p.retweet_from === post.id && p.user_id === userId) : false;
+        
+        // 获取转发原帖
+        let retweet_post = null;
+        if (post.retweet_from) {
+          const origPost = db.data.posts.find(p => p.id === post.retweet_from);
+          if (origPost) {
+            const origUser = db.data.users[origPost.user_id];
+            retweet_post = { ...origPost, username: origUser?.username, display_name: origUser?.display_name, avatar: origUser?.avatar };
+          }
+        }
+        
+        return {
+          ...post,
+          user_id: user?.id,
+          username: user?.username,
+          display_name: user?.display_name,
+          avatar: user?.avatar,
+          likes_count,
+          comments_count,
+          retweets_count,
+          liked_by_me: liked_by_me ? 1 : 0,
+          retweeted_by_me: retweeted_by_me ? 1 : 0,
+          retweet_post
+        };
+      });
 
     res.json({ posts });
   } catch (error) {
@@ -73,35 +66,23 @@ router.get('/', optionalAuth, (req, res) => {
 });
 
 // 获取单个帖子
-router.get('/:id', optionalAuth, (req, res) => {
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user ? req.user.id : null;
-
-    const post = db.prepare(`
-      SELECT 
-        p.id, p.content, p.image_url, p.retweet_from, p.created_at,
-        u.id as user_id, u.username, u.display_name, u.avatar,
-        (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as likes_count,
-        (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count,
-        (SELECT COUNT(*) FROM posts WHERE retweet_from = p.id) as retweets_count,
-        (SELECT COUNT(*) FROM likes WHERE post_id = p.id AND user_id = ?) as liked_by_me,
-        (SELECT COUNT(*) FROM posts WHERE retweet_from = p.id AND user_id = ?) as retweeted_by_me
-      FROM posts p
-      JOIN users u ON p.user_id = u.id
-      WHERE p.id = ?
-    `).get(userId, userId, id);
-
+    await db.read();
+    const post = db.data.posts.find(p => p.id === parseInt(id));
+    
     if (!post) return res.status(404).json({ error: '帖子不存在' });
-    res.json({ post });
+    
+    const user = db.data.users[post.user_id];
+    res.json({ post: { ...post, username: user?.username, display_name: user?.display_name, avatar: user?.avatar } });
   } catch (error) {
-    console.error('Get post error:', error);
     res.status(500).json({ error: '服务器错误' });
   }
 });
 
 // 发帖
-router.post('/', authenticateToken, upload.single('image'), (req, res) => {
+router.post('/', authenticateToken, upload.single('image'), async (req, res) => {
   try {
     const { content, retweet_from } = req.body;
 
@@ -113,21 +94,22 @@ router.post('/', authenticateToken, upload.single('image'), (req, res) => {
       return res.status(400).json({ error: '内容不能超过280个字符' });
     }
 
+    await db.read();
+    
     const image_url = req.file ? `/uploads/${req.file.filename}` : null;
+    const newPost = {
+      id: db.data.posts.length,
+      user_id: req.user.id,
+      content,
+      image_url,
+      retweet_from: retweet_from ? parseInt(retweet_from) : null,
+      created_at: new Date().toISOString()
+    };
 
-    const stmt = db.prepare(
-      `INSERT INTO posts (user_id, content, image_url, retweet_from) VALUES (?, ?, ?, ?)`
-    );
-    const result = stmt.run(req.user.id, content, image_url, retweet_from || null);
+    db.data.posts.push(newPost);
+    await db.write();
 
-    const post = db.prepare(
-      `SELECT p.*, u.username, u.display_name, u.avatar FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = ?`
-    ).get(result.lastInsertRowid);
-
-    res.status(201).json({ 
-      message: '发帖成功', 
-      post: { ...post, likes_count: 0, comments_count: 0, retweets_count: 0 }
-    });
+    res.status(201).json({ message: '发帖成功', post: newPost });
   } catch (error) {
     console.error('Create post error:', error);
     res.status(500).json({ error: '服务器错误' });
@@ -135,90 +117,86 @@ router.post('/', authenticateToken, upload.single('image'), (req, res) => {
 });
 
 // 删除帖子
-router.delete('/:id', authenticateToken, (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
+    await db.read();
+    const postIndex = db.data.posts.findIndex(p => p.id === parseInt(id));
+    
+    if (postIndex === -1) return res.status(404).json({ error: '帖子不存在' });
+    if (db.data.posts[postIndex].user_id !== req.user.id) return res.status(403).json({ error: '只能删除自己的帖子' });
 
-    const post = db.prepare('SELECT user_id FROM posts WHERE id = ?').get(id);
-    if (!post) return res.status(404).json({ error: '帖子不存在' });
-    if (post.user_id !== req.user.id) return res.status(403).json({ error: '只能删除自己的帖子' });
-
-    db.prepare('DELETE FROM posts WHERE id = ?').run(id);
+    db.data.posts.splice(postIndex, 1);
+    await db.write();
     res.json({ message: '删除成功' });
   } catch (error) {
-    console.error('Delete post error:', error);
     res.status(500).json({ error: '服务器错误' });
   }
 });
 
 // 点赞
-router.post('/:id/like', authenticateToken, (req, res) => {
+router.post('/:id/like', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-
-    const post = db.prepare('SELECT id FROM posts WHERE id = ?').get(id);
-    if (!post) return res.status(404).json({ error: '帖子不存在' });
-
-    const existingLike = db.prepare('SELECT id FROM likes WHERE user_id = ? AND post_id = ?').get(req.user.id, id);
+    await db.read();
+    
+    const existingLike = db.data.likes.find(l => l.post_id === parseInt(id) && l.user_id === req.user.id);
 
     if (existingLike) {
-      db.prepare('DELETE FROM likes WHERE user_id = ? AND post_id = ?').run(req.user.id, id);
+      db.data.likes = db.data.likes.filter(l => !(l.post_id === parseInt(id) && l.user_id === req.user.id));
+      await db.write();
       res.json({ liked: false, message: '取消点赞' });
     } else {
-      db.prepare('INSERT INTO likes (user_id, post_id) VALUES (?, ?)').run(req.user.id, id);
+      db.data.likes.push({ user_id: req.user.id, post_id: parseInt(id), created_at: new Date().toISOString() });
+      await db.write();
       res.json({ liked: true, message: '点赞成功' });
     }
   } catch (error) {
-    console.error('Like error:', error);
     res.status(500).json({ error: '服务器错误' });
   }
 });
 
 // 转发
-router.post('/:id/retweet', authenticateToken, (req, res) => {
+router.post('/:id/retweet', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-
-    const post = db.prepare('SELECT id FROM posts WHERE id = ?').get(id);
-    if (!post) return res.status(404).json({ error: '帖子不存在' });
-
-    const existingRetweet = db.prepare('SELECT id FROM posts WHERE user_id = ? AND retweet_from = ?').get(req.user.id, id);
+    await db.read();
+    
+    const existingRetweet = db.data.posts.find(p => p.retweet_from === parseInt(id) && p.user_id === req.user.id);
 
     if (existingRetweet) {
-      db.prepare('DELETE FROM posts WHERE id = ?').run(existingRetweet.id);
+      db.data.posts = db.data.posts.filter(p => !(p.retweet_from === parseInt(id) && p.user_id === req.user.id));
+      await db.write();
       res.json({ retweeted: false, message: '取消转发' });
     } else {
-      db.prepare('INSERT INTO posts (user_id, content, retweet_from) VALUES (?, \'\', ?)').run(req.user.id, id);
+      db.data.posts.push({ id: db.data.posts.length, user_id: req.user.id, content: '', retweet_from: parseInt(id), created_at: new Date().toISOString() });
+      await db.write();
       res.json({ retweeted: true, message: '转发成功' });
     }
   } catch (error) {
-    console.error('Retweet error:', error);
     res.status(500).json({ error: '服务器错误' });
   }
 });
 
 // 获取评论
-router.get('/:id/comments', optionalAuth, (req, res) => {
+router.get('/:id/comments', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
-
-    const comments = db.prepare(`
-      SELECT c.*, u.username, u.display_name, u.avatar
-      FROM comments c
-      JOIN users u ON c.user_id = u.id
-      WHERE c.post_id = ?
-      ORDER BY c.created_at DESC
-    `).all(id);
-
+    await db.read();
+    const comments = db.data.comments
+      .filter(c => c.post_id === parseInt(id))
+      .map(c => {
+        const user = db.data.users[c.user_id];
+        return { ...c, username: user?.username, display_name: user?.display_name, avatar: user?.avatar };
+      });
     res.json({ comments });
   } catch (error) {
-    console.error('Get comments error:', error);
     res.status(500).json({ error: '服务器错误' });
   }
 });
 
 // 发表评论
-router.post('/:id/comments', authenticateToken, (req, res) => {
+router.post('/:id/comments', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { content } = req.body;
@@ -227,20 +205,21 @@ router.post('/:id/comments', authenticateToken, (req, res) => {
       return res.status(400).json({ error: '请输入评论内容' });
     }
 
-    const post = db.prepare('SELECT id FROM posts WHERE id = ?').get(id);
-    if (!post) return res.status(404).json({ error: '帖子不存在' });
+    await db.read();
+    const newComment = {
+      id: db.data.comments.length,
+      user_id: req.user.id,
+      post_id: parseInt(id),
+      content,
+      created_at: new Date().toISOString()
+    };
 
-    const stmt = db.prepare('INSERT INTO comments (user_id, post_id, content) VALUES (?, ?, ?)');
-    const result = stmt.run(req.user.id, id, content);
+    db.data.comments.push(newComment);
+    await db.write();
 
-    const comment = db.prepare(`
-      SELECT c.*, u.username, u.display_name, u.avatar
-      FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = ?
-    `).get(result.lastInsertRowid);
-
-    res.status(201).json({ comment, message: '评论成功' });
+    const user = db.data.users[req.user.id];
+    res.status(201).json({ comment: { ...newComment, username: user?.username, display_name: user?.display_name, avatar: user?.avatar }, message: '评论成功' });
   } catch (error) {
-    console.error('Comment error:', error);
     res.status(500).json({ error: '服务器错误' });
   }
 });

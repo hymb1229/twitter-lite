@@ -1,33 +1,17 @@
-const { Low } = require('lowdb');
-const { JSONFile } = require('lowdb/node');
-const path = require('path');
-const fs = require('fs');
+const { Pool } = require('pg');
+require('dotenv').config();
 
-const dataDir = path.join(__dirname, '../data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
-
-const file = path.join(dataDir, 'twitter.json');
-
-const defaultData = {
-  users: [],
-  posts: [],
-  likes: [],
-  comments: [],
-  follows: []
-};
-
-const adapter = new JSONFile(file, defaultData);
-const db = new Low(adapter, defaultData);
-
-// 初始化数据库
-db.read().then(() => {
-  if (!db.data) {
-    db.data = defaultData;
-    db.write();
-  }
-  console.log('✅ Database connected (lowdb)');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
-module.exports = db;
+pool.on('connect', () => {
+  console.log('✅ Connected to PostgreSQL database');
+});
+
+pool.on('error', (err) => {
+  console.error('Database error:', err);
+});
+
+module.exports = pool;

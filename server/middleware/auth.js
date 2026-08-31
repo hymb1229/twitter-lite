@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const db = require('../db');
+const pool = require('../db');
 
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -11,14 +11,16 @@ const authenticateToken = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    await db.read();
-    const user = db.data.users.find(u => u.id === decoded.userId);
+    const result = await pool.query(
+      'SELECT id, username, email, display_name, bio, avatar FROM users WHERE id = $1',
+      [decoded.userId]
+    );
 
-    if (!user) {
+    if (result.rows.length === 0) {
       return res.status(401).json({ error: '用户不存在' });
     }
 
-    req.user = { id: user.id, username: user.username, email: user.email, display_name: user.display_name, bio: user.bio, avatar: user.avatar };
+    req.user = result.rows[0];
     next();
   } catch (error) {
     return res.status(403).json({ error: '登录已过期，请重新登录' });
@@ -36,9 +38,12 @@ const optionalAuth = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    await db.read();
-    const user = db.data.users.find(u => u.id === decoded.userId);
-    req.user = user ? { id: user.id, username: user.username, email: user.email, display_name: user.display_name, bio: user.bio, avatar: user.avatar } : null;
+    const result = await pool.query(
+      'SELECT id, username, email, display_name, bio, avatar FROM users WHERE id = $1',
+      [decoded.userId]
+    );
+
+    req.user = result.rows.length > 0 ? result.rows[0] : null;
   } catch (error) {
     req.user = null;
   }

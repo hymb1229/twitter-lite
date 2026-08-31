@@ -1,24 +1,16 @@
 const { Pool } = require('pg');
-require('dotenv').config();
 
-console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_B7FbVmn6EYga@ep-fragrant-surf-ae6sbogi-pooler.c-2.us-east-2.aws.neon.tech/风舞?sslmode=require&channel_binding=require';
+
+console.log('Connecting to database...');
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
 pool.on('connect', () => {
-  console.log('✅ Database connected successfully');
-});
-
-pool.on('error', (err) => {
-  console.error('Database pool error:', err.message);
+  console.log('✅ Database connected');
 });
 
 module.exports = pool;
-
-// 测试连接
-pool.query('SELECT NOW()')
-  .then(() => console.log('✅ PostgreSQL connection OK'))
-  .catch(err => console.error('❌ PostgreSQL connection failed:', err.message));

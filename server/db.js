@@ -1,32 +1,11 @@
-const { Low } = require('lowdb');
-const { JSONFile } = require('lowdb/node');
-const path = require('path');
-const fs = require('fs');
+const { Pool } = require('pg');
 
-const dataDir = path.join(__dirname, '../data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
+const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_B7FbVmn6EYga@ep-fragrant-surf-ae6sbogi-pooler.c-2.us-east-2.aws.neon.tech/风舞?sslmode=require';
 
-const file = path.join(dataDir, 'twitter.json');
-
-const defaultData = {
-  users: [],
-  posts: [],
-  likes: [],
-  comments: [],
-  follows: []
-};
-
-const adapter = new JSONFile(file, defaultData);
-const db = new Low(adapter, defaultData);
-
-db.read().then(() => {
-  if (!db.data) {
-    db.data = defaultData;
-    db.write();
-  }
-  console.log('✅ Database ready');
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
-module.exports = db;
+pool.on('connect', () => console.log('✅ Database connected'));
+module.exports = pool;
